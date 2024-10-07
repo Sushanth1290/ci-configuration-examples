@@ -1,0 +1,116 @@
+clc;
+clear all;
+
+% Initial Setup
+In_Bal = 100;  % Initial Open Balance
+bet_amount = 1;  % Initial bet amount
+max_losses = 18;  % Maximum consecutive losses
+Stop_Loss = 2^(18-1);
+Win_Streak_Value = 3;
+Loss_Streak = 0;  % Track consecutive losses
+Win_Streak = 0;  % Track consecutive wins
+previousNumber = -1;  % Initialize to an invalid number
+totalWinnings = 0;  % Initialize total winnings
+
+% Counters for win streaks, loss streaks, and stop losses
+totalWinStreaks = 0;  % Total count of win streaks
+totalLossStreaks = 0;  % Total count of loss streaks
+totalStopLosses = 0;  % Total count of stop losses
+lossStreakRows = [];  % Array to store the row indices of loss streaks
+
+% Load data from the file
+filename = '707492_playtech_live_1.txt';  % Name of the file
+numbers = load(filename);  % Read numbers from the file
+
+% Initialize the betting columns
+currentBetColumns = [];  % To track current betting columns
+
+ for i = 1:length(numbers)
+% for i = 1:100
+    Win_Num = numbers(i);  % Get the current number
+
+    % Determine current betting columns based on the previous number
+    if previousNumber >= 1 && previousNumber <= 12
+        currentBetColumns = [2, 3];  % Bet on columns 2 and 3
+    elseif previousNumber >= 13 && previousNumber <= 24
+        currentBetColumns = [1, 3];  % Bet on columns 1 and 3
+    elseif previousNumber >= 25 && previousNumber <= 36
+        currentBetColumns = [1, 2];  % Bet on columns 1 and 2
+    else
+        currentBetColumns = [];  % No bet on zero or invalid
+    end
+
+    % Betting logic based on the win number
+    if ~isempty(currentBetColumns)
+        % Check if the winning number is in the current betting columns
+        if (Win_Num >= 1 && Win_Num <= 12 && ismember(1, currentBetColumns)) || ...
+           (Win_Num >= 13 && Win_Num <= 24 && ismember(2, currentBetColumns)) || ...
+           (Win_Num >= 25 && Win_Num <= 36 && ismember(3, currentBetColumns))
+            % Win on the current bet
+            In_Bal = In_Bal + bet_amount;  % Win payout
+            totalWinnings = totalWinnings + bet_amount;  % Track winnings
+            fprintf('[%d, %d, Win] - Win! Current Bet: %.2f, Balance: %.2f\n', i, Win_Num, bet_amount, In_Bal);
+            Win_Streak = Win_Streak + 1;  % Increment win streak
+            Loss_Streak = 0;  % Reset loss streak
+        else
+            % Loss for any other number
+            In_Bal = In_Bal - (2 * bet_amount);  % Deduct the current bet amount
+            totalWinnings = totalWinnings - (2 * bet_amount);  % Track losses
+            fprintf('[%d, %d, Loss] - Loss! Current Bet: %.2f, Balance: %.2f\n', i, Win_Num, bet_amount, In_Bal);
+            bet_amount = 2 * bet_amount;  % Double the bet
+            Loss_Streak = Loss_Streak + 1;  % Increment loss streak
+            Win_Streak = 0;  % Reset win streak on loss
+
+            % Check if the loss streak reaches max_losses
+            if Loss_Streak == max_losses
+                lossStreakRows = [lossStreakRows, i];  % Store the current row index
+            end
+
+            % Check if the bet amount exceeds 256
+            if bet_amount > Stop_Loss
+                Win_Streak = 1;  % Reset win streak to 1
+                bet_amount = 1;  % Reset to initial bet
+                totalStopLosses = totalStopLosses + 1;  % Increment stop loss counter
+                fprintf('Bet amount exceeded 256, resetting win streak to 1 and bet amount to initial.\n');
+            end
+        end
+    else
+        % If there is no bet based on previous number
+        fprintf('[%d, %d] - No Bet. Current Bet: %.2f, Balance: %.2f\n', i, Win_Num, bet_amount, In_Bal);
+    end
+
+    % Check for loss streak reset
+    if Loss_Streak >= max_losses
+        totalLossStreaks = totalLossStreaks + 1;  % Increment loss streak counter
+        Loss_Streak = 1;  % Reset loss streak to 1
+        bet_amount = 1;  % Reset to initial bet
+        fprintf('Loss streak reached %d, resetting bet amount to initial.\n', max_losses);
+    end
+
+    % Check for win streak reset
+    if Win_Streak >= Win_Streak_Value
+        totalWinStreaks = totalWinStreaks + 1;  % Increment win streak counter
+        Win_Streak = 1;  % Reset win streak to 1
+        bet_amount = 1;  % Reset to initial bet
+        fprintf('Win streak reached 3, resetting bet amount to initial.\n');
+    end
+
+    % Update previous number for the next iteration
+    previousNumber = Win_Num; 
+end
+
+% Display final results
+fprintf('Total Winnings after %d spins: $%.2f\n', length(numbers), totalWinnings);
+fprintf('Final Balance: $%.2f\n', In_Bal);
+fprintf('Total Win Streaks: %d\n', totalWinStreaks);
+fprintf('Total Loss Streaks: %d\n', totalLossStreaks);
+fprintf('Total Stop Losses: %d\n', totalStopLosses);
+
+% Display the row indices of loss streaks
+if ~isempty(lossStreakRows)
+    fprintf('Loss streaks occurred at rows: %s\n', num2str(lossStreakRows));
+else
+    fprintf('No loss streaks recorded.\n');
+end
+
+
